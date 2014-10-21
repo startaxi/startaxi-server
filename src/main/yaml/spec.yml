@@ -1,0 +1,247 @@
+swagger: '2.0'
+info:
+  title: Startaxi API
+  description: Start your Taxi adventure from your Android Wear device
+  version: "1.0.0"
+host: startaxi.2m.lt
+schemes:
+  - http
+basePath: /v1
+produces:
+  - application/json
+paths:
+  /taxi/provider:
+    get:
+      summary: Get available taxi providers in the area
+      description: |
+        Returns information about available taxi providers in the area.
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: UserPosition
+      responses:
+        200:
+          description: A list of Taxi providers ready to serve in the area
+          schema:
+            type: array
+            items:
+              $ref: Provider
+        500:
+          description: Any error
+          schema:
+            $ref: Error
+  /taxi/estimate:
+    get:
+      summary: Get available taxi providers and the estimates to the destinations
+      description: |
+        Get available taxi providers and the estimates to the destinations.
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: PossibleJourneys
+      responses:
+        200:
+          description: Estimated journeys from taxi providers
+          schema:
+            type: array
+            items:
+              $ref: Estimate
+        500:
+          description: Any error
+          schema:
+            $ref: Error
+  /taxi/order:
+    post:
+      summary: Order a taxi
+      description: |
+        Place a taxi order to the selected provider with user and destination coordinates.
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: Order
+      responses:
+        200:
+          description: Created order information
+          schema:
+            $ref: Arrival
+        500:
+          description: Any error
+          schema:
+            $ref: Error
+    put:
+      summary: Send preferences to the particular order
+      description: |
+        Interact with the driver by sending preferences to the particular order.
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: Preferences
+      responses:
+        200:
+          description: Answer from the driver
+          schema:
+            $ref: DriverMessage
+        500:
+          description: Any error
+          schema:
+            $ref: Error
+  /taxi/order/{id}:
+    get:
+      summary: Get order information
+      description: |
+        Get order information. Can be streamed using SSE.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Order ID
+          type: integer
+          format: int32
+        - name: interval
+          in: query
+          required: false
+          description: If set responses will come as SSE every `interval` seconds
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: Created order id
+          schema:
+            $ref: Arrival
+        500:
+          description: Any error
+          schema:
+            $ref: Error
+definitions:
+  Coordinates:
+    properties:
+      lat:
+        type: number
+        description: Latitude
+      lon:
+        type: number
+        description: Longtitude
+  UserPosition:
+    properties:
+      coordinates:
+        $ref: Coordinates
+        description: User coordinates
+  Destination:
+    properties:
+      id:
+        type: integer
+        format: int32
+      coordinates:
+        $ref: Coordinates
+        description: Destination coordinates
+  PossibleJourneys:
+    properties:
+      user_position:
+        $ref: UserPosition
+        description: User position
+      destinations:
+        type: array
+        items:
+          $ref: Destination
+        description: Journey estimates
+  Estimate:
+    properties:
+      provider:
+        $ref: Provider
+        description: Taxi provider for this estimate
+      destination:
+        $ref: Destination
+        description: Destination of this estimated journey
+      price:
+        type: number
+        format: decimal
+        descrion: Estimated price in EUR
+      travel_time:
+        type: integer
+        format: int32
+        description: Estimated travel time in seconds
+      distance:
+        type: integer
+        format: int32
+        description: Estimated travel distance in meters
+  Provider:
+    properties:
+      id:
+        type: integer
+        format: int32
+        description: Provider ID
+      name:
+        type: string
+        description: Provider name
+      price_per_km:
+        type: number
+        format: decimal
+        description: Price per kilometer in EUR
+      arrival_eta:
+        type: integer
+        format: int32
+        description: Time to arrival in seconds
+  Order:
+    properties:
+      provider_id:
+        type: integer
+        format: int32
+        description: Taxi Provider ID
+      user_position:
+        $ref: UserPosition
+        description: User position
+      destination:
+        $ref: Destination
+        description: Destination of this taxi order
+  Arrival:
+    properties:
+      order_id:
+        type: integer
+        format: int32
+        description: Order ID
+      taxi_position:
+        $ref: Coordinates
+        description: Taxi coordinates
+      arrival_eta:
+        type: integer
+        format: int32
+        description: Time to arrival in seconds
+      arrived:
+        type: boolean
+        description: Has the taxi arrived for the pickup
+  Preferences:
+    properties:
+      order_id:
+        type: integer
+        format: int32
+        description: Order ID
+      radio_station:
+        type: string
+        description: Preferred radio station name
+      spotify_playlist_id:
+        type: integer
+        format: int32
+        description: Preferred spotify playlist name
+      chat_message:
+        type: string
+        descriotion: Chat message to driver
+  DriverMessage:
+    properties:
+      chat_message:
+        type: string
+        description: Chat message from driver (e.g. 'nekanalina :|')
+  Error:
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string

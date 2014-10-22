@@ -1,3 +1,5 @@
+import NativePackagerKeys._
+
 name := "startaxi-api-server"
 
 version := "0.0.1-SNAPSHOT"
@@ -19,3 +21,5 @@ libraryDependencies ++= {
 }
 
 resolvers += "spray repo" at "http://repo.spray.io"
+
+packageArchetype.java_application

@@ -27,14 +27,7 @@ object WsServer {
 
     def businessLogic: Receive
 
-    def businessLogicNoUpgrade: Receive = {
-      implicit val refFactory: ActorRefFactory = context
-      runRoute {
-        path("") {
-          getFromResource("webapp/index.html")
-        } ~ getFromResourceDirectory("webapp")
-      }
-    }
+    def businessLogicNoUpgrade: Receive
   }
 
 }

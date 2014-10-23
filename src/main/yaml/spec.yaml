@@ -28,7 +28,7 @@ paths:
             type: array
             items:
               $ref: Provider
-        500:
+        400:
           description: Any error
           schema:
             $ref: Error
@@ -50,7 +50,7 @@ paths:
             type: array
             items:
               $ref: Estimate
-        500:
+        400:
           description: Any error
           schema:
             $ref: Error
@@ -70,7 +70,7 @@ paths:
           description: Created order information
           schema:
             $ref: Arrival
-        500:
+        400:
           description: Any error
           schema:
             $ref: Error
@@ -89,7 +89,7 @@ paths:
           description: Answer from the driver
           schema:
             $ref: DriverMessage
-        500:
+        400:
           description: Any error
           schema:
             $ref: Error
@@ -116,7 +116,7 @@ paths:
           description: Created order id
           schema:
             $ref: Arrival
-        500:
+        400:
           description: Any error
           schema:
             $ref: Error

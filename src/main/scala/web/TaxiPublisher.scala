@@ -1,6 +1,6 @@
 package web
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import spray.can.websocket.frame.TextFrame
 import spray.json._
 import taxilator.Taxi.Position
@@ -10,18 +10,13 @@ object TaxiPublisherJsonProtocol extends DefaultJsonProtocol {
   implicit val positionFormat = jsonFormat3(Position)
 }
 
-object TaxiPublisher {
-  def props() =
-    (serverConnection: ActorRef) => Props(classOf[TaxiPublisher], serverConnection)
-}
-
-class TaxiPublisher(serverConnection: ActorRef) extends WebSocketWorker(serverConnection) {
+trait TaxiPublisher { this: WebSocketWorker =>
 
   import TaxiPublisherJsonProtocol._
 
   context.system.eventStream.subscribe(self, classOf[Position])
 
-  def businessLogic = {
+  def taxiPublisher: Receive = {
     case pos: Position => send(TextFrame(pos.toJson.toString))
   }
 

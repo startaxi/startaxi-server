@@ -11,4 +11,3 @@ EndOfMessage
 )
 
 curl http://localhost:8080/api/taxi/provider -H "Content-Type:application/json" -X GET --data "$PROVIDER"
-

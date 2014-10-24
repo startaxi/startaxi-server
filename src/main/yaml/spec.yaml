@@ -144,7 +144,7 @@ definitions:
         description: Destination coordinates
   PossibleJourneys:
     properties:
-      user_position:
+      userPosition:
         $ref: UserPosition
         description: User position
       destinations:
@@ -164,7 +164,7 @@ definitions:
         type: number
         format: decimal
         descrion: Estimated price in EUR
-      travel_time:
+      travelTime:
         type: integer
         format: int32
         description: Estimated travel time in seconds
@@ -181,11 +181,11 @@ definitions:
       name:
         type: string
         description: Provider name
-      price_per_km:
+      pricePerKm:
         type: number
         format: decimal
         description: Price per kilometer in EUR
-      arrival_eta:
+      arrivalEta:
         type: integer
         format: int32
         description: Time to arrival in seconds
@@ -237,7 +237,7 @@ definitions:
     properties:
       chat_message:
         type: string
-        description: Chat message from driver (e.g. 'nekanalina :|')
+        description: Chat message from driver (e.g. nekanalina)
   Error:
     properties:
       code:

@@ -8,13 +8,21 @@ import spray.json.DefaultJsonProtocol
 import spray.routing.HttpService
 import spray.routing.RejectionHandler
 import startaxi.Main.OverseerAware
+import taxilator.Taxi.Coords
 
 object TaxiService {
   case class Error(code: Int, message: String)
 
-  case class Coordinates(lat: Long, lon: Long)
+  case class Coordinates(lat: Double, lon: Double) {
+    def asCoords: Coords =
+      Coords(lat = lat, lon = lon)
+  }
   case class UserPosition(coordinates: Coordinates)
   case class Provider(id: Int, name: String, pricePerKm: Double, arrivalEta: Long)
+
+  case class Destination(id: Int, coordinates: Coordinates)
+  case class PossibleJourneys(userPosition: UserPosition, destinations: List[Destination])
+  case class Estimate(provider: Provider, destination: Destination, price: Double, travelTime: Long, distance: Long)
 }
 
 object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
@@ -25,6 +33,10 @@ object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
   implicit val coordinatesFormat = jsonFormat2(Coordinates)
   implicit val userPositionFormat = jsonFormat1(UserPosition)
   implicit val providerFormat = jsonFormat4(Provider)
+
+  implicit val destinationFormat = jsonFormat2(Destination)
+  implicit val possibleJourneysFormat = jsonFormat2(PossibleJourneys)
+  implicit val estimateFormat = jsonFormat5(Estimate)
 }
 
 trait TaxiService extends HttpService { self: OverseerAware =>
@@ -49,13 +61,21 @@ trait TaxiService extends HttpService { self: OverseerAware =>
     actorRefFactory.actorOf(props)
 
   val provider = path("provider") {
-      get {
-        entity(as[UserPosition]) { userPosition =>
-          ctx => overseer ! (ctx, userPosition)
-        }
+    get {
+      entity(as[UserPosition]) { userPosition =>
+        ctx => overseer ! (ctx, userPosition)
       }
     }
+  }
 
-  val taxiService = provider
+  val estimate = path("estimate") {
+    get {
+      entity(as[PossibleJourneys]) { possibleJourneys =>
+        ctx => overseer ! (ctx, possibleJourneys)
+      }
+    }
+  }
+
+  val taxiService = provider ~ estimate
 
 }

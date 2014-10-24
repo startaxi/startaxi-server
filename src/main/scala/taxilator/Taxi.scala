@@ -12,7 +12,8 @@ import org.joda.time.DateTime
 object Taxi {
   case object Wrum
   case object LunchBreakOver
-  case class Client()
+  case object ClientDelivered
+  case class Client(overseer: ActorRef)
 
   final val CarSpeedMetersPerMs = 50.0 / 1000 // meters per ms
   final val TaxiTickEveryMs = 40
@@ -85,11 +86,13 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
     {
       case LunchBreakOver => andThen match {
         case Some(coords) => resolve(position, coords, None, client)
-        case None => goToRandomLocation(position)
+        case None =>
+          client.fold()(_.overseer ! ClientDelivered)
+          goToRandomLocation(position)
       }
       case PickupAndThen(pickupFrom, newAndThen) => client match {
-        case Some(Client()) => // neg
-        case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+        case Some(Client(o)) => // neg
+        case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client(sender())))
       }
       case _ => log.debug(s"idle at $position")
     }: Receive
@@ -107,8 +110,8 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
       case _ => context.become(busy(position, route, DateTime.now, andThen, client))
     }
     case PickupAndThen(pickupFrom, newAndThen) => client match {
-      case Some(Client()) => // neg
-      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+      case Some(Client(o)) => // neg
+      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client(sender())))
     }
   }: Receive
 
@@ -139,8 +142,8 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
         case _ => context.become(busy(newPos, route.copy(path = newPath), now - timeLeft.toLong.toDuration.millis, andThen, client))
       }
     case PickupAndThen(pickupFrom, newAndThen) => client match {
-      case Some(Client()) => // neg
-      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+      case Some(Client(o)) => // neg
+      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client(sender())))
     }
   }
 

@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import akka.actor.Props
 import spray.routing.RequestContext
 import taxilator.Taxi
+import taxilator.Taxi.ClientDelivered
 import taxilator.Taxi.PickupAndThen
 import taxilator.Taxi.StaticProviderData
 import taxilator.Taxi.Coords
@@ -33,13 +34,19 @@ class Overseer extends Actor {
 
   context.system.eventStream.subscribe(self, classOf[Position])
 
-  var taxiMap = Map[StaticProviderData, Set[TaxiInstance]]()
-  var inflightArrivals = Set[Arrival]()
+  var taxiMap = Map[StaticProviderData, Seq[TaxiInstance]]()
+  var inflightArrivals = Set[(Arrival, ActorRef)]()
 
   def receive = {
     case Position(ref, _, provider, lon, lat) =>
-      val providerSet = taxiMap.getOrElse(provider, Set()).filterNot(_.ref == ref) + TaxiInstance(ref, Coords(lat = lat, lon = lon))
+      val providerSet = taxiMap.getOrElse(provider, Seq()).filterNot(_.ref == ref) :+ TaxiInstance(ref, Coords(lat = lat, lon = lon))
       taxiMap += (provider -> providerSet)
+
+    case ClientDelivered =>
+      inflightArrivals = inflightArrivals.filterNot {
+        case (_, ref) if ref == sender() => true
+        case _ => false
+      }
 
     case (ctx: RequestContext, UserPosition(position)) =>
 
@@ -68,7 +75,8 @@ class Overseer extends Actor {
       ctx.complete(estimates)
 
     case (ctx: RequestContext, Order(providerId, userPosition, destination)) =>
-      val taxiToOrder = closestTaxiTo(userPosition.coordinates).filterKeys(_.id == providerId).values.headOption
+      val providerTaxis = taxisInOrderTo(userPosition.coordinates).filterKeys(_.id == providerId).values.head
+      val taxiToOrder = providerTaxis.filterNot(taxi => inflightArrivals.map(_._2).contains(taxi.ref)).headOption
 
       taxiToOrder.fold(ctx.complete(Error.NoTaxiFromProvider(providerId))) { taxi =>
         val (_, arrivalEta) = distanceAndTime(taxi.coords, userPosition.coordinates.asCoords)
@@ -78,12 +86,19 @@ class Overseer extends Actor {
           arrivalEta, arrived = false
         )
         taxi.ref ! PickupAndThen(userPosition.coordinates.asCoords, destination.coordinates.asCoords)
+        inflightArrivals += ((arrival, taxi.ref))
         ctx.complete(arrival)
       }
   }
 
+  def taxisInOrderTo(destination: Coordinates) =
+    taxiMap.mapValues(_.sortBy { taxi =>
+      val (distance, _) = distanceAndTime(taxi.coords, destination.asCoords)
+      distance
+    })
+
   def closestTaxiTo(destination: Coordinates) =
-    taxiMap.mapValues(_.minBy(taxi => distanceAndTime(taxi.coords, destination.asCoords)))
+    taxisInOrderTo(destination).mapValues(_.head)
 
   def distanceAndTime(from: Coords, to: Coords) = {
     val distanceMeters = (to - from).mag

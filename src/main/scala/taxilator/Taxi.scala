@@ -38,13 +38,14 @@ object Taxi {
     private def r(latRad: Double) = EarthRadius * math.cos(latRad)
   }
   case class Route(path: List[Coords], distance: Double, traveltime: Long)
-  case class Position(id: String, provider: String, pricePerKm: Double, lon: Double, lat: Double)
+  case class Position(id: String, provider: StaticProviderData, lon: Double, lat: Double)
+  case class StaticProviderData(id: String, name: String, price: Double, color: String)
 
-  def props(id: Int, provider: String, price: Double) =
-    Props(new Taxi(id, provider, price))
+  def props(provider: StaticProviderData) =
+    Props(new Taxi(provider))
 }
 
-class Taxi(id: Int, provider: String, price: Double) extends Actor with ActorLogging {
+class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
 
   import Taxi._
   import context.dispatcher
@@ -106,7 +107,7 @@ class Taxi(id: Int, provider: String, price: Double) extends Actor with ActorLog
           (projectedPos, route.path, 0.0)
 
       log.debug(s"busybusy, timeLeft: $timeLeft, newPos: $newPos, head: ${route.path.head}, dropped: ${route.path.size - newPath.size}, newPathSize: ${newPath.size}")
-      context.system.eventStream.publish(Position(self.toString(), provider, price, newPos.lon, newPos.lat))
+      context.system.eventStream.publish(Position(self.toString(), provider, newPos.lon, newPos.lat))
 
       newPath match {
         case Nil => context.become(idle(newPos))

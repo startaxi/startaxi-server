@@ -3,6 +3,7 @@ package worker
 import akka.actor.{Props, Actor}
 import spray.routing.RequestContext
 import taxilator.Taxi
+import taxilator.Taxi.StaticProviderData
 import taxilator.Taxi.{Coords, Position}
 import web.TaxiService.{Provider, Coordinates, UserPosition}
 
@@ -10,7 +11,7 @@ object Overseer {
   def props =
     Props(new Overseer())
 
-  case class TaxiInstance(id: String, pricePerKm: Double, coords: Coords)
+  case class TaxiInstance(id: String, coords: Coords)
 }
 
 class Overseer extends Actor {
@@ -19,14 +20,12 @@ class Overseer extends Actor {
 
   context.system.eventStream.subscribe(self, classOf[Position])
 
-  var taxiMap = Map[String, Set[TaxiInstance]]()
-  var providerPrice = Map[String, Double]()
+  var taxiMap = Map[StaticProviderData, Set[TaxiInstance]]()
 
   def receive = {
-    case Position(id, provider, pricePerKm, lon, lat) =>
-      val providerSet = taxiMap.getOrElse(provider, Set()) + TaxiInstance(id, pricePerKm, Coords(lat = lat, lon = lon))
+    case Position(id, provider, lon, lat) =>
+      val providerSet = taxiMap.getOrElse(provider, Set()) + TaxiInstance(id, Coords(lat = lat, lon = lon))
       taxiMap += (provider -> providerSet)
-      providerPrice += (provider -> pricePerKm)
 
     case (ctx: RequestContext, UserPosition(Coordinates(lat, lon))) =>
 
@@ -39,8 +38,8 @@ class Overseer extends Actor {
         provider -> shortestEta.toLong // in seconds
       }
 
-      val providers = taxiMap map { case (provider, _) =>
-        Provider(provider.hashCode, provider, providerPrice(provider), providerArrivalEta(provider))
+      val providers = providerArrivalEta map { case (provider, arrivalEta) =>
+        Provider(provider.id.hashCode.abs, provider.name, provider.price, arrivalEta)
       }
 
       ctx.complete(providers)

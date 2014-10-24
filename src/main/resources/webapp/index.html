@@ -18,6 +18,7 @@
   <div id="map" style="width: 100%; height: 100%"></div>
 
   <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+  <script src="https://cdn.rawgit.com/jseppi/Leaflet.MakiMarkers/4dc725dfc816cc4d1c6738e1cf668729b15c6fb9/Leaflet.MakiMarkers.js"></script>
   <script>
 
     var map = L.map('map').setView([54.688723, 25.270403], 13);
@@ -46,7 +47,12 @@
 
       var marker = taxiMap[data.id];
       if (marker === undefined) {
-        taxiMap[data.id] = L.marker(coords).addTo(map);
+        var taxiIcon = L.MakiMarkers.icon({
+          icon: "car",
+          color: data.color,
+          size: "l"
+        });
+        taxiMap[data.id] = L.marker(coords, { icon: taxiIcon }).addTo(map);
       }
       else {
         marker.setLatLng(coords);

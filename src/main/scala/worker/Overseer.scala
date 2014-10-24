@@ -37,7 +37,7 @@ class Overseer extends Actor {
   var inflightArrivals = Set[Arrival]()
 
   def receive = {
-    case Position(ref, provider, lon, lat) =>
+    case Position(ref, _, provider, lon, lat) =>
       val providerSet = taxiMap.getOrElse(provider, Set()).filterNot(_.ref == ref) + TaxiInstance(ref, Coords(lat = lat, lon = lon))
       taxiMap += (provider -> providerSet)
 

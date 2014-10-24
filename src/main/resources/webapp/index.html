@@ -46,16 +46,17 @@
         var coords = [data.lat, data.lon];
 
         var marker = taxiMap[data.id];
+        var taxiIcon = L.MakiMarkers.icon({
+          icon: data.occupied ? "rocket" : "car",
+          color: data.color,
+          size: "l"
+        });
         if (marker === undefined) {
-          var taxiIcon = L.MakiMarkers.icon({
-            icon: "car",
-            color: data.color,
-            size: "l"
-          });
           taxiMap[data.id] = L.marker(coords, { icon: taxiIcon }).addTo(map);
         }
         else {
           marker.setLatLng(coords);
+          marker.setIcon(taxiIcon);
         }
       });
     }

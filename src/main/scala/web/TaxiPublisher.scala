@@ -9,9 +9,9 @@ import taxilator.Taxi.StaticProviderData
 import web.WsServer.WebSocketWorker
 
 object TaxiPublisherJsonProtocol extends DefaultJsonProtocol {
-  implicit val webPositionFormat = jsonFormat4(WebPosition)
+  implicit val webPositionFormat = jsonFormat5(WebPosition)
 
-  case class WebPosition(id: String, lat: Double, lon: Double, color: String)
+  case class WebPosition(id: String, occupied: Boolean, lat: Double, lon: Double, color: String)
 }
 
 object TaxiPublisher {
@@ -37,8 +37,8 @@ trait TaxiPublisher { this: WebSocketWorker =>
   }
 
   def taxiPublisher: Receive = {
-    case Position(ref, StaticProviderData(_, _, _, color), lon, lat) =>
-      positionToPublish :+= WebPosition(ref.toString, lat, lon, color)
+    case Position(ref, client, StaticProviderData(_, _, _, color), lon, lat) =>
+      positionToPublish :+= WebPosition(ref.toString, client.fold(false)(_ => true), lat, lon, color)
     case Publish =>
       send(TextFrame(positionToPublish.toJson.toString))
       positionToPublish = List[WebPosition]()

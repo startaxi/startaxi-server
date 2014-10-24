@@ -3,6 +3,7 @@ package web
 import akka.actor.{Actor, ActorRef, Props}
 import spray.can.websocket.frame.TextFrame
 import spray.json._
+import taxilator.Taxi
 import taxilator.Taxi.Position
 import taxilator.Taxi.StaticProviderData
 import web.WsServer.WebSocketWorker
@@ -13,16 +14,34 @@ object TaxiPublisherJsonProtocol extends DefaultJsonProtocol {
   case class WebPosition(id: String, lat: Double, lon: Double, color: String)
 }
 
+object TaxiPublisher {
+  case object Publish
+}
+
 trait TaxiPublisher { this: WebSocketWorker =>
 
+  import TaxiPublisher._
   import TaxiPublisherJsonProtocol._
 
   context.system.eventStream.subscribe(self, classOf[Position])
+  val publish = {
+    import scala.concurrent.duration._
+    import context.dispatcher
+    context.system.scheduler.schedule(0.seconds, Taxi.TaxiTickEveryMs.millis, self, Publish)
+  }
+
+  var positionToPublish = List[WebPosition]()
+
+  override def postStop(): Unit = {
+    publish.cancel()
+  }
 
   def taxiPublisher: Receive = {
     case Position(id, StaticProviderData(_, _, _, color), lon, lat) =>
-      val webPosition = WebPosition(id, lat, lon, color)
-      send(TextFrame(webPosition.toJson.toString))
+      positionToPublish :+= WebPosition(id, lat, lon, color)
+    case Publish =>
+      send(TextFrame(positionToPublish.toJson.toString))
+      positionToPublish = List[WebPosition]()
   }
 
 }

@@ -13,6 +13,7 @@ object Taxi {
   case object LunchBreakOver
 
   final val CarSpeedMetersPerMs = 50.0 / 1000 // meters per ms
+  final val TaxiTickEveryMs = 40
 
   case class CartVector(x: Double, y: Double) {
     def norm: CartVector = mag match {
@@ -52,7 +53,7 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
 
   val engine = {
     import scala.concurrent.duration.DurationInt
-    context.system.scheduler.schedule(DurationInt(1).second, DurationInt(40).millis, self, Wrum)
+    context.system.scheduler.schedule(DurationInt(1).second, DurationInt(TaxiTickEveryMs).millis, self, Wrum)
   }
 
   override def postStop(): Unit = {

@@ -37,10 +37,8 @@ object Main {
     val workerProps = (conn: ActorRef) => Props(new StartaxiService(conn))
     val server = system.actorOf(WebSocketServer.props(workerProps), "websocket")
 
-    Props(new Taxi())
-
-    (0 until 10).foreach { i =>
-      system.actorOf(Props[Taxi], s"taxi-$i")
+    (0 until 0).foreach { i =>
+      system.actorOf(Taxi.props(i, "Blue Taxi", 1.00), s"taxi-$i")
     }
 
     val port = sys.env.getOrElse("PORT", "8080").toInt

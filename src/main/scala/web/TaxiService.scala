@@ -1,8 +1,10 @@
 package web
 
+import akka.actor.Props
 import spray.http.{ContentTypes, HttpEntity, HttpResponse}
 import spray.json.DefaultJsonProtocol
 import spray.routing.{HttpService, RejectionHandler}
+import worker.ProviderWorker
 
 object TaxiService {
   case class Error(code: Int, message: String)
@@ -25,7 +27,6 @@ object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
 trait TaxiService extends HttpService {
 
   import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
-  import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
   import web.TaxiService._
   import web.TaxiServiceJsonProtocol._
 
@@ -41,12 +42,15 @@ trait TaxiService extends HttpService {
     }
   }
 
+  def spawnWorker(props: Props) =
+    actorRefFactory.actorOf(props)
+
   val provider = path("provider") {
       get {
         entity(as[UserPosition]) { userPosition =>
-          complete {
-            val resp = Provider(1, "SmartTaxi", 12.0, 300)
-            Seq(resp)
+          ctx => {
+            val worker = spawnWorker(ProviderWorker.props(ctx))
+            worker ! userPosition
           }
         }
       }

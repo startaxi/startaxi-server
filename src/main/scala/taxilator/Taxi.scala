@@ -1,6 +1,6 @@
 package taxilator
 
-import akka.actor.{ActorLogging, Actor}
+import akka.actor.{Props, ActorLogging, Actor}
 import akka.pattern.pipe
 import org.joda.time.DateTime
 
@@ -35,9 +35,12 @@ object Taxi {
   }
   case class Route(path: List[Coords], distance: Double, traveltime: Long)
   case class Position(id: String, lon: Double, lat: Double)
+
+  def props(id: Int, name: String, price: Double) =
+    Props(new Taxi(id, name, price))
 }
 
-class Taxi extends Actor with ActorLogging {
+class Taxi(id: Int, name: String, price: Double) extends Actor with ActorLogging {
 
   import Taxi._
   import context.dispatcher

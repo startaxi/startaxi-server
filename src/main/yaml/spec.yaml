@@ -175,8 +175,7 @@ definitions:
   Provider:
     properties:
       id:
-        type: integer
-        format: int32
+        type: string
         description: Provider ID
       name:
         type: string
@@ -191,11 +190,10 @@ definitions:
         description: Time to arrival in seconds
   Order:
     properties:
-      provider_id:
-        type: integer
-        format: int32
+      providerId:
+        type: string
         description: Taxi Provider ID
-      user_position:
+      userPosition:
         $ref: UserPosition
         description: User position
       destination:
@@ -203,14 +201,14 @@ definitions:
         description: Destination of this taxi order
   Arrival:
     properties:
-      order_id:
+      orderId:
         type: integer
         format: int32
         description: Order ID
-      taxi_position:
+      taxiPosition:
         $ref: Coordinates
         description: Taxi coordinates
-      arrival_eta:
+      arrivalEta:
         type: integer
         format: int32
         description: Time to arrival in seconds

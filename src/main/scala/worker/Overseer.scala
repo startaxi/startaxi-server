@@ -1,13 +1,18 @@
 package worker
 
 import akka.actor.Actor
+import akka.actor.ActorRef
 import akka.actor.Props
 import spray.routing.RequestContext
 import taxilator.Taxi
+import taxilator.Taxi.PickupAndThen
 import taxilator.Taxi.StaticProviderData
 import taxilator.Taxi.Coords
 import taxilator.Taxi.Position
+import web.TaxiService.Arrival
+import web.TaxiService.Error
 import web.TaxiService.Estimate
+import web.TaxiService.Order
 import web.TaxiService.PossibleJourneys
 import web.TaxiService.Coordinates
 import web.TaxiService.Provider
@@ -17,7 +22,7 @@ object Overseer {
   def props =
     Props(new Overseer())
 
-  case class TaxiInstance(id: String, coords: Coords)
+  case class TaxiInstance(ref: ActorRef, coords: Coords)
 }
 
 class Overseer extends Actor {
@@ -29,16 +34,18 @@ class Overseer extends Actor {
   context.system.eventStream.subscribe(self, classOf[Position])
 
   var taxiMap = Map[StaticProviderData, Set[TaxiInstance]]()
+  var inflightArrivals = Set[Arrival]()
 
   def receive = {
-    case Position(id, provider, lon, lat) =>
-      val providerSet = taxiMap.getOrElse(provider, Set()).filterNot(_.id == id) + TaxiInstance(id, Coords(lat = lat, lon = lon))
+    case Position(ref, provider, lon, lat) =>
+      val providerSet = taxiMap.getOrElse(provider, Set()).filterNot(_.ref == ref) + TaxiInstance(ref, Coords(lat = lat, lon = lon))
       taxiMap += (provider -> providerSet)
 
-    case (ctx: RequestContext, UserPosition(coords)) =>
+    case (ctx: RequestContext, UserPosition(position)) =>
 
-      val providers = providerArrivalEta(coords) map { case (provider, arrivalEta) =>
-        Provider(provider.id.hashCode.abs, provider.name, provider.price, arrivalEta)
+      val providers = closestTaxiTo(position) map { case (provider, taxi) =>
+        val (_, arrivalEta) = distanceAndTime(taxi.coords, position.asCoords)
+        Provider(provider.id, provider.name, provider.price, arrivalEta)
       }
 
       ctx.complete(providers)
@@ -46,24 +53,41 @@ class Overseer extends Actor {
     case (ctx: RequestContext, PossibleJourneys(userPosition, destinations)) =>
 
       val estimates = for {
-        (provider, arrivalEta) <- providerArrivalEta(userPosition.coordinates)
+        (provider, taxi) <- closestTaxiTo(userPosition.coordinates)
         destination <- destinations
       } yield {
-        val distanceInMeters = (userPosition.coordinates.asCoords - destination.coordinates.asCoords).mag.toLong
-        val travelTimeInSeconds = distanceInMeters / (Taxi.CarSpeedMetersPerMs * 1000)
+        val (_, arrivalEta) = distanceAndTime(taxi.coords, userPosition.coordinates.asCoords)
+        val (distanceInMeters, travelTimeInSeconds) =
+          distanceAndTime(userPosition.coordinates.asCoords, destination.coordinates.asCoords)
         val price = provider.price / 1000 * distanceInMeters
         Estimate(
-          Provider(provider.id.hashCode.abs, provider.name, provider.price, arrivalEta),
+          Provider(provider.id, provider.name, provider.price, arrivalEta),
           destination, price, travelTimeInSeconds.toLong, distanceInMeters)
       }
 
       ctx.complete(estimates)
+
+    case (ctx: RequestContext, Order(providerId, userPosition, destination)) =>
+      val taxiToOrder = closestTaxiTo(userPosition.coordinates).filterKeys(_.id == providerId).values.headOption
+
+      taxiToOrder.fold(ctx.complete(Error.NoTaxiFromProvider(providerId))) { taxi =>
+        val (_, arrivalEta) = distanceAndTime(taxi.coords, userPosition.coordinates.asCoords)
+        val arrival = Arrival(
+          (math.random * 1000).toInt,
+          Coordinates(lat = taxi.coords.lat, lon = taxi.coords.lon),
+          arrivalEta, arrived = false
+        )
+        taxi.ref ! PickupAndThen(userPosition.coordinates.asCoords, destination.coordinates.asCoords)
+        ctx.complete(arrival)
+      }
   }
 
-  def providerArrivalEta(coordinates: Coordinates) = {
-    taxiMap.map { case (provider, taxiSet) =>
-      val shortestEta = taxiSet.map(taxi => (taxi.coords - coordinates.asCoords).mag).min / (Taxi.CarSpeedMetersPerMs * 1000) // euristics
-      provider -> shortestEta.toLong // in seconds
-    }
+  def closestTaxiTo(destination: Coordinates) =
+    taxiMap.mapValues(_.minBy(taxi => distanceAndTime(taxi.coords, destination.asCoords)))
+
+  def distanceAndTime(from: Coords, to: Coords) = {
+    val distanceMeters = (to - from).mag
+    val arrivalEta = distanceMeters / (Taxi.CarSpeedMetersPerMs * 1000) // euristics
+    (distanceMeters.toLong, arrivalEta.toLong)
   }
 }

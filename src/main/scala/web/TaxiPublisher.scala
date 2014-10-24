@@ -37,8 +37,8 @@ trait TaxiPublisher { this: WebSocketWorker =>
   }
 
   def taxiPublisher: Receive = {
-    case Position(id, StaticProviderData(_, _, _, color), lon, lat) =>
-      positionToPublish :+= WebPosition(id, lat, lon, color)
+    case Position(ref, StaticProviderData(_, _, _, color), lon, lat) =>
+      positionToPublish :+= WebPosition(ref.toString, lat, lon, color)
     case Publish =>
       send(TextFrame(positionToPublish.toJson.toString))
       positionToPublish = List[WebPosition]()

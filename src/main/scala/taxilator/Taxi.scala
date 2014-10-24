@@ -2,6 +2,7 @@ package taxilator
 
 import akka.actor.Actor
 import akka.actor.ActorLogging
+import akka.actor.ActorRef
 import akka.actor.Props
 import akka.actor.Status
 import akka.pattern.pipe
@@ -11,6 +12,7 @@ import org.joda.time.DateTime
 object Taxi {
   case object Wrum
   case object LunchBreakOver
+  case class Client()
 
   final val CarSpeedMetersPerMs = 50.0 / 1000 // meters per ms
   final val TaxiTickEveryMs = 40
@@ -39,8 +41,9 @@ object Taxi {
     private def r(latRad: Double) = EarthRadius * math.cos(latRad)
   }
   case class Route(path: List[Coords], distance: Double, traveltime: Long)
-  case class Position(id: String, provider: StaticProviderData, lon: Double, lat: Double)
+  case class Position(ref: ActorRef, provider: StaticProviderData, lon: Double, lat: Double)
   case class StaticProviderData(id: String, name: String, price: Double, color: String)
+  case class PickupAndThen(pickup: Coords, andThen: Coords)
 
   def props(provider: StaticProviderData) =
     Props(new Taxi(provider))
@@ -61,35 +64,56 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
   }
 
   // Lukiškių Square
-  def receive = idle(Coords(lon = 25.270403, lat = 54.688723))
+  def receive = idle(Coords(lon = 25.270403, lat = 54.688723), None, None)
 
   def goToRandomLocation(position: Coords): Unit = {
     val destination = randomLocation(position)
     log.debug(s"Will go to $destination")
-    Navigator.resolve(position, destination) pipeTo self
-    context.become(resolvingRoute(position))
+    resolve(position, destination, None, None)
   }
 
-  val idle = (position: Coords) => {
+  def resolve(position: Coords, destination: Coords, andThen: Option[Coords], client: Option[Client]): Unit = {
+    Navigator.resolve(position, destination) pipeTo self
+    context.become(resolvingRoute(position, andThen, client))
+  }
+
+  val idle = (position: Coords, andThen: Option[Coords], client: Option[Client]) => {
     {
       import scala.concurrent.duration.DurationInt
       context.system.scheduler.scheduleOnce(DurationInt(10).seconds, self, LunchBreakOver)
     }
     {
-      case LunchBreakOver => goToRandomLocation(position)
+      case LunchBreakOver => andThen match {
+        case Some(coords) => resolve(position, coords, None, client)
+        case None => goToRandomLocation(position)
+      }
+      case PickupAndThen(pickupFrom, newAndThen) => client match {
+        case Some(Client()) => // neg
+        case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+      }
       case _ => log.debug(s"idle at $position")
     }: Receive
   }
 
-  val resolvingRoute = (position: Coords) => {
+  val resolvingRoute = (position: Coords, andThen: Option[Coords], client: Option[Client]) => {
     case Wrum => log.debug(s"resolving")
     case Status.Failure(f) =>
       log.info(s"Was unable to resolve $position. Got ${f.getMessage}. Trying again.")
       goToRandomLocation(position)
-    case route: Route => context.become(busy(position, route, DateTime.now))
+    case route: Route => route.path match {
+      case Nil =>
+        log.info(s"Got empty path when trying to move from $position")
+        goToRandomLocation(position)
+      case _ => context.become(busy(position, route, DateTime.now, andThen, client))
+    }
+    case PickupAndThen(pickupFrom, newAndThen) => client match {
+      case Some(Client()) => // neg
+      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+    }
   }: Receive
 
-  val busy: (Coords, Route, DateTime) => Receive = (position: Coords, route: Route, timestamp: DateTime) => {
+  val busy: (Coords, Route, DateTime, Option[Coords], Option[Client]) => Receive =
+    (position: Coords, route: Route, timestamp: DateTime, andThen: Option[Coords], client: Option[Client]) => {
     case Wrum =>
       val now = DateTime.now
       val millisSince = (timestamp to now).millis
@@ -108,12 +132,16 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
           (projectedPos, route.path, 0.0)
 
       log.debug(s"busybusy, timeLeft: $timeLeft, newPos: $newPos, head: ${route.path.head}, dropped: ${route.path.size - newPath.size}, newPathSize: ${newPath.size}")
-      context.system.eventStream.publish(Position(self.toString(), provider, newPos.lon, newPos.lat))
+      context.system.eventStream.publish(Position(self, provider, newPos.lon, newPos.lat))
 
       newPath match {
-        case Nil => context.become(idle(newPos))
-        case _ => context.become(busy(newPos, route.copy(path = newPath), now - timeLeft.toLong.toDuration.millis))
+        case Nil => context.become(idle(newPos, andThen, client))
+        case _ => context.become(busy(newPos, route.copy(path = newPath), now - timeLeft.toLong.toDuration.millis, andThen, client))
       }
+    case PickupAndThen(pickupFrom, newAndThen) => client match {
+      case Some(Client()) => // neg
+      case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client()))
+    }
   }
 
   def randomLocation(point: Coords) = {

@@ -7,7 +7,7 @@ import taxilator.Taxi.Position
 import web.WsServer.WebSocketWorker
 
 object TaxiPublisherJsonProtocol extends DefaultJsonProtocol {
-  implicit val positionFormat = jsonFormat3(Position)
+  implicit val positionFormat = jsonFormat5(Position)
 }
 
 trait TaxiPublisher { this: WebSocketWorker =>

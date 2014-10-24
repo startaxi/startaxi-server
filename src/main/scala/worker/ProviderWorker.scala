@@ -1,20 +1,20 @@
 package worker
 
-import akka.actor.{Props, Actor}
+import akka.actor.Actor
+import akka.actor.ActorRef
+import akka.actor.Props
 import spray.routing.RequestContext
 
 object ProviderWorker {
-  def props(ctx: RequestContext) = Props(new ProviderWorker(ctx))
+  def props(ctx: RequestContext, overseer: ActorRef) = Props(new ProviderWorker(ctx, overseer))
 }
 
-class ProviderWorker(ctx: RequestContext) extends Actor {
-
-  import spray.httpx.SprayJsonSupport._
+class ProviderWorker(ctx: RequestContext, overseer: ActorRef) extends Actor {
 
   import web.TaxiService._
-  import web.TaxiServiceJsonProtocol._
 
   def receive = {
-    case p: UserPosition => ctx.complete(Seq(Provider(1, "Taxi", 12.0, 300)))
+    case position: UserPosition => overseer ! position
+    //case providers: List[Provider] => ctx.complete(Seq(Provider(1, "Taxi", 12.0, 300)))
   }
 }

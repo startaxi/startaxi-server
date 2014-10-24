@@ -1,10 +1,13 @@
 package web
 
 import akka.actor.Props
-import spray.http.{ContentTypes, HttpEntity, HttpResponse}
+import spray.http.ContentTypes
+import spray.http.HttpEntity
+import spray.http.HttpResponse
 import spray.json.DefaultJsonProtocol
-import spray.routing.{HttpService, RejectionHandler}
-import worker.ProviderWorker
+import spray.routing.HttpService
+import spray.routing.RejectionHandler
+import startaxi.Main.OverseerAware
 
 object TaxiService {
   case class Error(code: Int, message: String)
@@ -24,7 +27,7 @@ object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
   implicit val providerFormat = jsonFormat4(Provider)
 }
 
-trait TaxiService extends HttpService {
+trait TaxiService extends HttpService { self: OverseerAware =>
 
   import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
   import web.TaxiService._
@@ -48,10 +51,7 @@ trait TaxiService extends HttpService {
   val provider = path("provider") {
       get {
         entity(as[UserPosition]) { userPosition =>
-          ctx => {
-            val worker = spawnWorker(ProviderWorker.props(ctx))
-            worker ! userPosition
-          }
+          ctx => overseer ! (ctx, userPosition)
         }
       }
     }

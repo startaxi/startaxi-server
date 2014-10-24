@@ -1,19 +1,37 @@
 package startaxi
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.actor.Props
 import akka.io.IO
+import com.typesafe.config.ConfigFactory
 import spray.can.Http
 import spray.can.server.UHttp
 import taxilator.Taxi
-import web.WsServer.{WebSocketServer, WebSocketWorker}
-import web.{AssetsService, TaxiPublisher, TaxiService}
+import web.WsServer.WebSocketServer
+import web.WsServer.WebSocketWorker
+import web.AssetsService
+import web.TaxiPublisher
+import web.TaxiService
+import worker.Overseer
 
 import scala.io.StdIn
 
+object Settings {
+  val config = ConfigFactory.load().getConfig("startaxi")
+
+  val taxiCount = config.getInt("taxi-count")
+}
+
 object Main {
 
-  class StartaxiService(serverConnection: ActorRef)
+  trait OverseerAware {
+    def overseer: ActorRef
+  }
+
+  class StartaxiService(serverConnection: ActorRef, override val overseer: ActorRef)
     extends WebSocketWorker(serverConnection)
+    with OverseerAware
     with AssetsService
     with TaxiPublisher
     with TaxiService
@@ -34,11 +52,12 @@ object Main {
   def main(args: Array[String]) {
 
     implicit val system = ActorSystem()
-    val workerProps = (conn: ActorRef) => Props(new StartaxiService(conn))
+    val overseer = system.actorOf(Overseer.props)
+    val workerProps = (conn: ActorRef) => Props(new StartaxiService(conn, overseer))
     val server = system.actorOf(WebSocketServer.props(workerProps), "websocket")
 
-    (0 until 0).foreach { i =>
-      system.actorOf(Taxi.props(i, "Blue Taxi", 1.00), s"taxi-$i")
+    (0 until Settings.taxiCount).foreach { i =>
+      system.actorOf(Taxi.props(i, "Blue Taxi", 0.69), s"taxi-$i")
     }
 
     val port = sys.env.getOrElse("PORT", "8080").toInt

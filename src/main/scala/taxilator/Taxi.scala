@@ -1,14 +1,18 @@
 package taxilator
 
-import akka.actor.{Props, ActorLogging, Actor}
+import akka.actor.Actor
+import akka.actor.ActorLogging
+import akka.actor.Props
+import akka.actor.Status
 import akka.pattern.pipe
-import org.joda.time.DateTime
-
 import com.github.nscala_time.time.Imports._
+import org.joda.time.DateTime
 
 object Taxi {
   case object Wrum
   case object LunchBreakOver
+
+  final val CarSpeedMetersPerMs = 50.0 / 1000 // meters per ms
 
   case class CartVector(x: Double, y: Double) {
     def norm: CartVector = mag match {
@@ -34,30 +38,35 @@ object Taxi {
     private def r(latRad: Double) = EarthRadius * math.cos(latRad)
   }
   case class Route(path: List[Coords], distance: Double, traveltime: Long)
-  case class Position(id: String, lon: Double, lat: Double)
+  case class Position(id: String, provider: String, pricePerKm: Double, lon: Double, lat: Double)
 
-  def props(id: Int, name: String, price: Double) =
-    Props(new Taxi(id, name, price))
+  def props(id: Int, provider: String, price: Double) =
+    Props(new Taxi(id, provider, price))
 }
 
-class Taxi(id: Int, name: String, price: Double) extends Actor with ActorLogging {
+class Taxi(id: Int, provider: String, price: Double) extends Actor with ActorLogging {
 
   import Taxi._
   import context.dispatcher
-
-  final val CarSpeed = 50.0 / 1000 // meters per ms
 
   val engine = {
     import scala.concurrent.duration.DurationInt
     context.system.scheduler.schedule(DurationInt(1).second, DurationInt(40).millis, self, Wrum)
   }
 
-  override def postStop: Unit = {
+  override def postStop(): Unit = {
     engine.cancel()
   }
 
   // Lukiškių Square
   def receive = idle(Coords(lon = 25.270403, lat = 54.688723))
+
+  def goToRandomLocation(position: Coords): Unit = {
+    val destination = randomLocation(position)
+    log.debug(s"Will go to $destination")
+    Navigator.resolve(position, destination) pipeTo self
+    context.become(resolvingRoute(position))
+  }
 
   val idle = (position: Coords) => {
     {
@@ -65,17 +74,16 @@ class Taxi(id: Int, name: String, price: Double) extends Actor with ActorLogging
       context.system.scheduler.scheduleOnce(DurationInt(10).seconds, self, LunchBreakOver)
     }
     {
-      case LunchBreakOver =>
-        val destination = randomLocation(position)
-        log.debug(s"will go to $destination")
-        Navigator.resolve(position, destination) pipeTo self
-        context.become(resolvingRoute(position))
+      case LunchBreakOver => goToRandomLocation(position)
       case _ => log.debug(s"idle at $position")
     }: Receive
   }
 
   val resolvingRoute = (position: Coords) => {
     case Wrum => log.debug(s"resolving")
+    case Status.Failure(f) =>
+      log.info(s"Was unable to resolve $position. Got ${f.getMessage}. Trying again.")
+      goToRandomLocation(position)
     case route: Route => context.become(busy(position, route, DateTime.now))
   }: Receive
 
@@ -85,7 +93,7 @@ class Taxi(id: Int, name: String, price: Double) extends Actor with ActorLogging
       val millisSince = (timestamp to now).millis
 
       val direction = (route.path.head - position).norm
-      val projectedPos = position + (direction * CarSpeed * millisSince)
+      val projectedPos = position + (direction * CarSpeedMetersPerMs * millisSince)
 
       val distanceToPath = (position - route.path.head).mag
       val distanceToProjectedPos = (position - projectedPos).mag
@@ -93,12 +101,12 @@ class Taxi(id: Int, name: String, price: Double) extends Actor with ActorLogging
       val (newPos, newPath, timeLeft) =
         if (distanceToProjectedPos > distanceToPath) {
           self ! Wrum // need another Wrum to use the remaining time
-          (route.path.head, route.path.tail, (distanceToProjectedPos - distanceToPath) / CarSpeed)
+          (route.path.head, route.path.tail, (distanceToProjectedPos - distanceToPath) / CarSpeedMetersPerMs)
         } else
           (projectedPos, route.path, 0.0)
 
       log.debug(s"busybusy, timeLeft: $timeLeft, newPos: $newPos, head: ${route.path.head}, dropped: ${route.path.size - newPath.size}, newPathSize: ${newPath.size}")
-      context.system.eventStream.publish(Position(self.toString, newPos.lon, newPos.lat))
+      context.system.eventStream.publish(Position(self.toString(), provider, price, newPos.lon, newPos.lat))
 
       newPath match {
         case Nil => context.become(idle(newPos))

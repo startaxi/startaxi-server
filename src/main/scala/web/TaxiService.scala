@@ -5,6 +5,7 @@ import spray.http.ContentTypes
 import spray.http.HttpEntity
 import spray.http.HttpHeaders.RawHeader
 import spray.http.HttpResponse
+import spray.http.StatusCodes
 import spray.json.DefaultJsonProtocol
 import spray.routing.HttpService
 import spray.routing.RejectionHandler
@@ -32,7 +33,7 @@ object TaxiService {
   case class Estimate(provider: Provider, destination: Destination, price: Double, travelTime: Long, distance: Long)
 
   case class Order(providerId: String, userPosition: UserPosition, destination: Destination)
-  case class Arrival(orderId: Int, taxiPosition: Coordinates, arrivalEta: Long, arrived: Boolean)
+  case class Arrival(orderId: Int, taxiPosition: Coordinates, arrivalEta: Long, pickedUp: Boolean, arrived: Boolean)
 
   case class Preferences(orderId: Int, radioStation: String, spotifyPlaylistId: Int, chatMessage: String)
   case class DriverMessage(chatMessage: String)
@@ -52,7 +53,7 @@ object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
   implicit val estimateFormat = jsonFormat5(Estimate)
 
   implicit val orderFormat = jsonFormat3(Order)
-  implicit val arrivalFormat = jsonFormat4(Arrival)
+  implicit val arrivalFormat = jsonFormat5(Arrival)
 
   implicit val preferencesFormat = jsonFormat4(Preferences)
   implicit val driverMessageFormat = jsonFormat1(DriverMessage)
@@ -116,8 +117,15 @@ trait TaxiService extends HttpService { self: OverseerAware =>
       }
     }
 
-  val taxiService = respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*")) {
-    provider ~ estimate ~ order
+  val taxiService = respondWithHeaders(
+    RawHeader("Access-Control-Allow-Origin", "*"),
+    RawHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+  ) {
+    options {
+      complete {
+        StatusCodes.OK
+      }
+    } ~ provider ~ estimate ~ order
   }
 
 }

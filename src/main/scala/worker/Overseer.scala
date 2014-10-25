@@ -5,6 +5,7 @@ import akka.actor.ActorRef
 import akka.actor.Props
 import spray.routing.RequestContext
 import taxilator.Taxi
+import taxilator.Taxi.Client
 import taxilator.Taxi.ClientDelivered
 import taxilator.Taxi.PickupAndThen
 import taxilator.Taxi.StaticProviderData
@@ -25,7 +26,8 @@ object Overseer {
   def props =
     Props(new Overseer())
 
-  case class TaxiInstance(ref: ActorRef, coords: Coords)
+  case class TaxiInstance(ref: ActorRef, andThen: Option[Coords], client: Option[Client], coords: Coords)
+  case class OrderInProgress(ref: ActorRef, order: Order)
 }
 
 class Overseer extends Actor {
@@ -37,17 +39,22 @@ class Overseer extends Actor {
   context.system.eventStream.subscribe(self, classOf[Position])
 
   var taxiMap = Map[StaticProviderData, Seq[TaxiInstance]]()
-  var inflightArrivals = Set[(Arrival, ActorRef)]()
+  var inflightTaxis = Map[Int, OrderInProgress]()
+  var completedOrders = Map[Int, Order]()
 
   def receive = {
-    case Position(ref, _, provider, lon, lat) =>
-      val providerSet = taxiMap.getOrElse(provider, Seq()).filterNot(_.ref == ref) :+ TaxiInstance(ref, Coords(lat = lat, lon = lon))
+    case Position(ref, andThen, client, provider, lon, lat) =>
+      val providerSet = taxiMap.getOrElse(provider, Seq()).filterNot(_.ref == ref) :+ TaxiInstance(ref, andThen, client, Coords(lat = lat, lon = lon))
       taxiMap += (provider -> providerSet)
 
     case ClientDelivered =>
-      inflightArrivals = inflightArrivals.filterNot {
-        case (_, ref) if ref == sender() => true
-        case _ => false
+      val completed = inflightTaxis.collect {
+        case (id, order) if order.ref == sender() => (id, order)
+      }.headOption
+
+      completed.fold() { case (id, order) =>
+        completedOrders += (id -> order.order)
+        inflightTaxis -= id
       }
 
     case (ctx: RequestContext, UserPosition(position)) =>
@@ -76,37 +83,52 @@ class Overseer extends Actor {
 
       ctx.complete(estimates)
 
-    case (ctx: RequestContext, Order(providerId, userPosition, destination)) =>
+    case (ctx: RequestContext, order @ Order(providerId, userPosition, destination)) =>
       val providerTaxis = taxisInOrderTo(userPosition.coordinates).filterKeys(_.id == providerId).values.head
-      val taxiToOrder = providerTaxis.filterNot(taxi => inflightArrivals.map(_._2).contains(taxi.ref)).headOption
+      val taxiToOrder = providerTaxis.filterNot(taxi => inflightTaxis.values.exists(_.ref == taxi.ref)).headOption
 
       taxiToOrder.fold(ctx.complete(Error.NoTaxiFromProvider(providerId))) { taxi =>
         val (_, arrivalEta) = distanceAndTime(taxi.coords, userPosition.coordinates.asCoords)
         val arrival = Arrival(
           (math.random * 1000).toInt,
           Coordinates(lat = taxi.coords.lat, lon = taxi.coords.lon),
-          arrivalEta, arrived = false
+          arrivalEta, pickedUp = false, arrived = false
         )
         taxi.ref ! PickupAndThen(userPosition.coordinates.asCoords, destination.coordinates.asCoords)
-        inflightArrivals += ((arrival, taxi.ref))
+        inflightTaxis += (arrival.orderId -> OrderInProgress(taxi.ref, order))
         ctx.complete(arrival)
       }
 
     case (ctx: RequestContext, orderId: Int) =>
-      arrivalByOrder(orderId).fold(ctx.complete(Error.NoOrderFound(orderId))) { arrival =>
-        ctx.complete(arrival)
+      val completedOrder = completedOrders.get(orderId).map(Left.apply)
+      val taxiAndOrderInProgress = taxiAndOrderById(orderId).map(Right.apply)
+
+      completedOrder.orElse(taxiAndOrderInProgress) match {
+        case Some(Right((taxi, order))) =>
+          val (arrivalEta, pickedUp) = taxi.andThen match {
+            case Some(_) => distanceAndTime(taxi.coords, order.order.userPosition.coordinates.asCoords)._2 -> false
+            case None => distanceAndTime(taxi.coords, order.order.destination.coordinates.asCoords)._2 -> true
+          }
+          val arrival = Arrival(orderId, Coordinates(lat = taxi.coords.lat, lon = taxi.coords.lon), arrivalEta, pickedUp, arrived = false)
+          ctx.complete(arrival)
+
+        case Some(Left(order)) =>
+          val arrival = Arrival(orderId, order.userPosition.coordinates, arrivalEta = 0, pickedUp = true, arrived = true)
+          ctx.complete(arrival)
+
+        case None => ctx.complete(Error.NoOrderFound(orderId))
       }
 
     case (ctx: RequestContext, preferences: Preferences) =>
-      arrivalByOrder(preferences.orderId).fold(ctx.complete(Error.NoOrderFound(preferences.orderId))) { arrival =>
+      taxiAndOrderById(preferences.orderId).fold(ctx.complete(Error.NoOrderFound(preferences.orderId))) { taxiAndOrder =>
         ctx.complete(DriverMessage("Biški nekanalina į Tauro kalną. Tuoj būsiu."))
       }
   }
 
-  def arrivalByOrder(orderId: Int) =
-    inflightArrivals.collect {
-      case (arrival, _) if arrival.orderId == orderId => arrival
-    }.headOption
+  def taxiAndOrderById(orderId: Int) =
+    inflightTaxis.get(orderId) flatMap { inProgressOrder =>
+      taxiMap.filterKeys(_.id == inProgressOrder.order.providerId).values.head.find(_.ref == inProgressOrder.ref).map(_ -> inProgressOrder)
+    }
 
   def taxisInOrderTo(destination: Coordinates) =
     taxiMap.mapValues(_.sortBy { taxi =>

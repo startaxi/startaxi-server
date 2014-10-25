@@ -70,7 +70,7 @@ object Main {
       import scala.concurrent.duration._
       import scala.concurrent.ExecutionContext.Implicits.global
 
-      val startTaxiAfter = Settings.taxiCount * providerIndex + index * 1000 // do not spam routing service
+      val startTaxiAfter = (Settings.taxiCount * providerIndex + index) * 1000 // do not spam routing service
       akka.pattern.after(startTaxiAfter.millis, system.scheduler) { Future {
         system.actorOf(Taxi.props(provider), s"taxi-${provider.id}-$index")
       }}

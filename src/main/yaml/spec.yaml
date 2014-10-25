@@ -214,9 +214,12 @@ definitions:
         type: integer
         format: int32
         description: Time to arrival in seconds
+      pickedUp:
+        type: boolean
+        description: Has the user been picked up from the source
       arrived:
         type: boolean
-        description: Has the taxi arrived for the pickup
+        description: Has the user arrived to the destination
   Preferences:
     properties:
       orderId:

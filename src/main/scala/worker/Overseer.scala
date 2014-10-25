@@ -89,6 +89,15 @@ class Overseer extends Actor {
         inflightArrivals += ((arrival, taxi.ref))
         ctx.complete(arrival)
       }
+
+    case (ctx: RequestContext, orderId: Int) =>
+      val requestedArrival = inflightArrivals.collect {
+        case (arrival, _) if arrival.orderId == orderId => arrival
+      }.headOption
+
+      requestedArrival.fold(ctx.complete(Error.NoOrderFound(orderId))) { arrival =>
+        ctx.complete(arrival)
+      }
   }
 
   def taxisInOrderTo(destination: Coordinates) =

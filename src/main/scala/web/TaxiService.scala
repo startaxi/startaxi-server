@@ -14,6 +14,8 @@ object TaxiService {
   object Error {
     val NoTaxiFromProvider = (providerId: String) =>
       Error(1, s"There is no available taxi from provider with id '$providerId'")
+    val NoOrderFound = (orderId: Int) =>
+      Error(2, s"There is no available order by id '$orderId'")
   }
   case class Error(code: Int, message: String)
 
@@ -86,13 +88,21 @@ trait TaxiService extends HttpService { self: OverseerAware =>
     }
   }
 
-  val order = path("order") {
-    post {
-      entity(as[Order]) { order =>
-        ctx => overseer ! (ctx, order)
+  val order =
+    pathPrefix("order"/ IntNumber) { orderId =>
+      pathEnd {
+        get {
+          ctx => overseer ! (ctx, orderId)
+        }
+      }
+    } ~
+    path("order") {
+      post {
+        entity(as[Order]) { order =>
+          ctx => overseer ! (ctx, order)
+        }
       }
     }
-  }
 
   val taxiService = provider ~ estimate ~ order
 

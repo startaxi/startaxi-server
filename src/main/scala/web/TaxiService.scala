@@ -32,6 +32,9 @@ object TaxiService {
 
   case class Order(providerId: String, userPosition: UserPosition, destination: Destination)
   case class Arrival(orderId: Int, taxiPosition: Coordinates, arrivalEta: Long, arrived: Boolean)
+
+  case class Preferences(orderId: Int, radioStation: String, spotifyPlaylistId: Int, chatMessage: String)
+  case class DriverMessage(chatMessage: String)
 }
 
 object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
@@ -49,6 +52,9 @@ object TaxiServiceJsonProtocol extends DefaultJsonProtocol {
 
   implicit val orderFormat = jsonFormat3(Order)
   implicit val arrivalFormat = jsonFormat4(Arrival)
+
+  implicit val preferencesFormat = jsonFormat4(Preferences)
+  implicit val driverMessageFormat = jsonFormat1(DriverMessage)
 }
 
 trait TaxiService extends HttpService { self: OverseerAware =>
@@ -100,6 +106,11 @@ trait TaxiService extends HttpService { self: OverseerAware =>
       post {
         entity(as[Order]) { order =>
           ctx => overseer ! (ctx, order)
+        }
+      } ~
+      put {
+        entity(as[Preferences]) { preferences =>
+          ctx => overseer ! (ctx, preferences)
         }
       }
     }

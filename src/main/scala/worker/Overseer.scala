@@ -11,11 +11,13 @@ import taxilator.Taxi.StaticProviderData
 import taxilator.Taxi.Coords
 import taxilator.Taxi.Position
 import web.TaxiService.Arrival
+import web.TaxiService.DriverMessage
 import web.TaxiService.Error
 import web.TaxiService.Estimate
 import web.TaxiService.Order
 import web.TaxiService.PossibleJourneys
 import web.TaxiService.Coordinates
+import web.TaxiService.Preferences
 import web.TaxiService.Provider
 import web.TaxiService.UserPosition
 
@@ -91,14 +93,20 @@ class Overseer extends Actor {
       }
 
     case (ctx: RequestContext, orderId: Int) =>
-      val requestedArrival = inflightArrivals.collect {
-        case (arrival, _) if arrival.orderId == orderId => arrival
-      }.headOption
-
-      requestedArrival.fold(ctx.complete(Error.NoOrderFound(orderId))) { arrival =>
+      arrivalByOrder(orderId).fold(ctx.complete(Error.NoOrderFound(orderId))) { arrival =>
         ctx.complete(arrival)
       }
+
+    case (ctx: RequestContext, preferences: Preferences) =>
+      arrivalByOrder(preferences.orderId).fold(ctx.complete(Error.NoOrderFound(preferences.orderId))) { arrival =>
+        ctx.complete(DriverMessage("Biški nekanalina į Tauro kalną. Tuoj būsiu."))
+      }
   }
+
+  def arrivalByOrder(orderId: Int) =
+    inflightArrivals.collect {
+      case (arrival, _) if arrival.orderId == orderId => arrival
+    }.headOption
 
   def taxisInOrderTo(destination: Coordinates) =
     taxiMap.mapValues(_.sortBy { taxi =>

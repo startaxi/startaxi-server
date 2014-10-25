@@ -217,23 +217,23 @@ definitions:
         description: Has the taxi arrived for the pickup
   Preferences:
     properties:
-      order_id:
+      orderId:
         type: integer
         format: int32
         description: Order ID
-      radio_station:
+      radioStation:
         type: string
         description: Preferred radio station name
-      spotify_playlist_id:
+      spotifyPlaylistId:
         type: integer
         format: int32
         description: Preferred spotify playlist name
-      chat_message:
+      chatMessage:
         type: string
         descriotion: Chat message to driver
   DriverMessage:
     properties:
-      chat_message:
+      chatMessage:
         type: string
         description: Chat message from driver (e.g. nekanalina)
   Error:

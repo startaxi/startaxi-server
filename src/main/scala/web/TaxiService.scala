@@ -3,6 +3,7 @@ package web
 import akka.actor.Props
 import spray.http.ContentTypes
 import spray.http.HttpEntity
+import spray.http.HttpHeaders.RawHeader
 import spray.http.HttpResponse
 import spray.json.DefaultJsonProtocol
 import spray.routing.HttpService
@@ -115,6 +116,8 @@ trait TaxiService extends HttpService { self: OverseerAware =>
       }
     }
 
-  val taxiService = provider ~ estimate ~ order
+  val taxiService = respondWithHeader(RawHeader("Access-Control-Allow-Origin", "*")) {
+    provider ~ estimate ~ order
+  }
 
 }

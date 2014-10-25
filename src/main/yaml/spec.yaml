@@ -4,9 +4,11 @@ info:
   description: Start your Taxi adventure from your Android Wear device
   version: "1.0.0"
 host: startaxi.2m.lt
+basePath: /api
 schemes:
   - http
-basePath: /v1
+consumes:
+  - application/json
 produces:
   - application/json
 paths:
@@ -162,7 +164,7 @@ definitions:
         description: Destination of this estimated journey
       price:
         type: number
-        format: decimal
+        format: double
         descrion: Estimated price in EUR
       travelTime:
         type: integer
@@ -182,7 +184,7 @@ definitions:
         description: Provider name
       pricePerKm:
         type: number
-        format: decimal
+        format: double
         description: Price per kilometer in EUR
       arrivalEta:
         type: integer

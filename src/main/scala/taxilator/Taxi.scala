@@ -95,7 +95,9 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
         case Some(Client(o)) => // neg
         case None => resolve(position, pickupFrom, Some(newAndThen), Some(Client(sender())))
       }
-      case _ => log.debug(s"idle at $position")
+      case _ =>
+        log.debug(s"idle at $position")
+        publish(andThen, client, position)
     }: Receive
   }
 
@@ -136,7 +138,7 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
           (projectedPos, route.path, 0.0)
 
       log.debug(s"busybusy, direction: $direction, projectedPos: $projectedPos, timeLeft: $timeLeft, newPos: $newPos, millisSince: $millisSince, timestamp: $timestamp, distanceToPath: $distanceToPath, distanceToProjectedPos: $distanceToProjectedPos, newPathSize: ${newPath.size}")
-      context.system.eventStream.publish(Position(self, andThen, client, provider, newPos.lon, newPos.lat))
+      publish(andThen, client, newPos)
 
       newPath match {
         case Nil => context.become(idle(newPos, andThen, client))
@@ -153,4 +155,7 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
       (math.random - 0.5) / 10
     Coords(lon = point.lon + randomDeviation, lat = point.lat + randomDeviation)
   }
+
+  def publish(andThen: Option[Coords], client: Option[Client], position: Coords) =
+    context.system.eventStream.publish(Position(self, andThen, client, provider, position.lon, position.lat))
 }

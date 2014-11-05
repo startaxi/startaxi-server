@@ -1,8 +1,11 @@
-package taxilator
+package taxilator.navigation
 
+import akka.actor.Actor
 import akka.actor.ActorContext
+import akka.actor.Props
 import akka.io.IO
 import akka.util.Timeout
+import akka.pattern.pipe
 import spray.can.server.UHttp
 import spray.client.pipelining._
 import spray.http.Uri
@@ -10,8 +13,9 @@ import spray.http.Uri.Query
 import spray.json.DefaultJsonProtocol
 import spray.util._
 import taxilator.Taxi.{Coords, Route}
+import taxilator.navigation.Navigator.NavigationRequest
 
-object NavigatorJsonProtocol extends DefaultJsonProtocol {
+object YourNavigationJsonProtocol extends DefaultJsonProtocol {
 
   case class GeojsonResult(coordinates: List[Seq[Double]], properties: Properties)
   case class Properties(distance: String, traveltime: String)
@@ -20,19 +24,30 @@ object NavigatorJsonProtocol extends DefaultJsonProtocol {
   implicit val geojsonResult = jsonFormat2(GeojsonResult)
 }
 
-object Navigator {
+object YourNavigation {
+  def props = Props(new YourNavigation())
+}
+
+class YourNavigation extends Actor {
+
+  import context.dispatcher
+
+  def receive = {
+    case NavigationRequest(from, to, receiver) => resolve(from, to) pipeTo receiver
+  }
 
   def resolve(from: Coords, to: Coords)(implicit context: ActorContext) = {
 
-    import context.dispatcher
+    import YourNavigationJsonProtocol._
     import spray.httpx.SprayJsonSupport._
-    import taxilator.NavigatorJsonProtocol._
 
-import scala.concurrent.duration._
-    implicit val timeout = Timeout(60.seconds)
-    implicit val sys = actorSystem
+    val pipeline = {
+      import context.system
+      import scala.concurrent.duration._
 
-    val pipeline = sendReceive(IO(UHttp)) ~> unmarshal[GeojsonResult]
+      implicit val timeout = Timeout(60.seconds)
+      sendReceive(IO(UHttp)) ~> unmarshal[GeojsonResult]
+    }
 
     pipeline {
       val query = Query(

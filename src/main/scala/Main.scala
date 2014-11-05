@@ -9,20 +9,22 @@ import spray.can.Http
 import spray.can.server.UHttp
 import taxilator.Taxi
 import taxilator.Taxi.StaticProviderData
-import web.WsServer.WebSocketServer
-import web.WsServer.WebSocketWorker
+import taxilator.navigation.Navigator
 import web.AssetsService
 import web.TaxiPublisher
 import web.TaxiService
+import web.WsServer.WebSocketServer
+import web.WsServer.WebSocketWorker
 import worker.Overseer
 
-import concurrent.Future
 import scala.io.StdIn
 
 object Settings {
   val config = ConfigFactory.load().getConfig("startaxi")
 
   val taxiCount = config.getInt("taxi-count")
+
+  val googleDirectionsApiKey = config.getString("google-directions-api-key")
 }
 
 object Main {
@@ -57,6 +59,7 @@ object Main {
     val overseer = system.actorOf(Overseer.props)
     val workerProps = (conn: ActorRef) => Props(new StartaxiService(conn, overseer))
     val server = system.actorOf(WebSocketServer.props(workerProps), "websocket")
+    val navigator = system.actorOf(Navigator.props, "navigator")
 
     val providers = Seq(
       StaticProviderData("blue-taxi", "Blue Taxi", 0.69, "#194069"),
@@ -67,13 +70,7 @@ object Main {
       (provider, providerIndex) <- providers.zipWithIndex
       index <- 0 until Settings.taxiCount
     } {
-      import scala.concurrent.duration._
-      import scala.concurrent.ExecutionContext.Implicits.global
-
-      val startTaxiAfter = (Settings.taxiCount * providerIndex + index) * 1000 // do not spam routing service
-      akka.pattern.after(startTaxiAfter.millis, system.scheduler) { Future {
-        system.actorOf(Taxi.props(provider), s"taxi-${provider.id}-$index")
-      }}
+      system.actorOf(Taxi.props(provider, navigator), s"taxi-${provider.id}-$index")
     }
 
     val port = sys.env.getOrElse("PORT", "8080").toInt

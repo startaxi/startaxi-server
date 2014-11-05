@@ -8,6 +8,7 @@ import akka.actor.Status
 import akka.pattern.pipe
 import com.github.nscala_time.time.Imports._
 import org.joda.time.DateTime
+import taxilator.navigation.{GoogleDirections, YourNavigation}
 
 object Taxi {
   case object Wrum
@@ -26,7 +27,7 @@ object Taxi {
     def mag: Double = math.sqrt(x * x + y * y)
     def *(factor: Double): CartVector = CartVector(x * factor, y * factor)
   }
-  case class Coords(lon: Double, lat: Double) {
+  case class Coords(lat: Double, lon: Double) {
 
     final val EarthRadius = 6371000 // meters
 
@@ -35,8 +36,8 @@ object Taxi {
       (lat - that.lat).toRadians * EarthRadius
     )
     def +(that: CartVector): Coords = Coords(
-      lon + (that.x / r(lat)).toDegrees,
-      lat + (that.y / EarthRadius).toDegrees
+      lon = lon + (that.x / r(lat)).toDegrees,
+      lat = lat + (that.y / EarthRadius).toDegrees
     )
 
     private def r(latRad: Double) = EarthRadius * math.cos(latRad)
@@ -46,11 +47,11 @@ object Taxi {
   case class StaticProviderData(id: String, name: String, price: Double, color: String)
   case class PickupAndThen(pickup: Coords, andThen: Coords)
 
-  def props(provider: StaticProviderData) =
-    Props(new Taxi(provider))
+  def props(provider: StaticProviderData, navigator: ActorRef) =
+    Props(new Taxi(provider, navigator))
 }
 
-class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
+class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor with ActorLogging {
 
   import Taxi._
   import context.dispatcher
@@ -74,7 +75,7 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
   }
 
   def resolve(position: Coords, destination: Coords, andThen: Option[Coords], client: Option[Client]): Unit = {
-    Navigator.resolve(position, destination) pipeTo self
+    navigator ! (position, destination)
     context.become(resolvingRoute(position, andThen, client))
   }
 
@@ -134,7 +135,7 @@ class Taxi(provider: Taxi.StaticProviderData) extends Actor with ActorLogging {
         } else
           (projectedPos, route.path, 0.0)
 
-      log.debug(s"busybusy, timeLeft: $timeLeft, newPos: $newPos, head: ${route.path.head}, dropped: ${route.path.size - newPath.size}, newPathSize: ${newPath.size}")
+      log.debug(s"busybusy, direction: $direction, projectedPos: $projectedPos, timeLeft: $timeLeft, newPos: $newPos, millisSince: $millisSince, timestamp: $timestamp, distanceToPath: $distanceToPath, distanceToProjectedPos: $distanceToProjectedPos, newPathSize: ${newPath.size}")
       context.system.eventStream.publish(Position(self, andThen, client, provider, newPos.lon, newPos.lat))
 
       newPath match {

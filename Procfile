@@ -1,1 +1,1 @@
-web: target/universal/stage/bin/startaxi-api-server Web
+web: target/universal/stage/bin/startaxi-server Web

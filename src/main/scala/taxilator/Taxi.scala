@@ -83,7 +83,9 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
   }
 
   val resolvingRoute = (position: Coords, andThen: Option[Coords], client: Option[Client]) => {
-    case Wrum => log.debug(s"resolving")
+    case Wrum =>
+      log.debug(s"resolving")
+      publish(andThen, client, position)
     case Status.Failure(f) =>
       log.info(s"Was unable to resolve $position. Got ${f.getMessage}. Trying again.")
       goToRandomLocation(position)

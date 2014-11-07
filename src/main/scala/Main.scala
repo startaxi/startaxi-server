@@ -1,12 +1,21 @@
 package startaxi
 
+import java.util.concurrent.TimeUnit
+
+import scala.concurrent.duration.DurationLong
+import scala.io.StdIn
+
+import com.typesafe.config.ConfigFactory
+
 import akka.actor.ActorRef
 import akka.actor.ActorSystem
 import akka.actor.Props
+import akka.actor.actorRef2Scala
+import akka.contrib.throttle.Throttler.Rate
 import akka.io.IO
-import com.typesafe.config.ConfigFactory
 import spray.can.Http
 import spray.can.server.UHttp
+import spray.routing.Directive.pimpApply
 import taxilator.Taxi
 import taxilator.Taxi.StaticProviderData
 import taxilator.navigation.Navigator
@@ -17,14 +26,21 @@ import web.WsServer.WebSocketServer
 import web.WsServer.WebSocketWorker
 import worker.Overseer
 
-import scala.io.StdIn
-
 object Settings {
   val config = ConfigFactory.load().getConfig("startaxi")
 
   val taxiCount = config.getInt("taxi-count")
 
   val googleDirectionsApiKey = config.getString("google-directions-api-key")
+
+  object Navigation {
+    val provider = Class.forName(config.getString("navigation.default.provider"))
+    val rate = {
+      val initialRate = Rate(config.getInt("navigation.default.requests"), config.getDuration("navigation.default.per", TimeUnit.MINUTES).minutes)
+      val normalizedRate = Rate(1, (initialRate.durationInMillis() / initialRate.numberOfCalls) milliseconds)
+      normalizedRate
+    }
+  }
 }
 
 object Main {

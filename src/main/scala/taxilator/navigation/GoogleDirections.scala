@@ -25,7 +25,7 @@ import taxilator.navigation.Navigator.NavigationRequest
 
 object GoogleDirectionsJsonProtocol extends SnakifiedSprayJsonSupport {
 
-  case class GoogleDirectionsResult(routes: List[Route])
+  case class GoogleDirectionsResult(routes: List[Route], status: String)
   case class Route(legs: List[Leg], overviewPolyline: Polyline)
   case class Polyline(points: String)
   case class Leg(distance: TextValue, duration: TextValue)
@@ -35,7 +35,7 @@ object GoogleDirectionsJsonProtocol extends SnakifiedSprayJsonSupport {
   implicit val legFormat = jsonFormat2(Leg)
   implicit val polylineFormat = jsonFormat1(Polyline)
   implicit val routeFormat = jsonFormat2(Route)
-  implicit val googleDirectionsResultFormat = jsonFormat1(GoogleDirectionsResult)
+  implicit val googleDirectionsResultFormat = jsonFormat2(GoogleDirectionsResult)
 }
 
 object GoogleDirections {
@@ -79,7 +79,7 @@ class GoogleDirections extends Actor with ActorLogging {
         log.info(s"Resolved route from $from to $to which is $distance meters long and will take $traveltime seconds with ${path.size} hops.")
 
         taxilator.Taxi.Route(path, distance, traveltime)
-      }.map(Future.successful).getOrElse(Future.failed(new IllegalArgumentException(s"Was not able to resolve route between $from and $to.")))
+      }.map(Future.successful).getOrElse(Future.failed(new IllegalArgumentException(s"Error while resolving from $from to $to. Status: ${result.status}.")))
     }
   }
 

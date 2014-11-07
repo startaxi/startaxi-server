@@ -6,6 +6,7 @@ import spray.json._
 import taxilator.Taxi
 import taxilator.Taxi.Position
 import taxilator.Taxi.StaticProviderData
+import taxilator.Units._
 import web.WsServer.WebSocketWorker
 
 object TaxiPublisherJsonProtocol extends DefaultJsonProtocol {
@@ -37,8 +38,8 @@ trait TaxiPublisher { this: WebSocketWorker =>
   }
 
   def taxiPublisher: Receive = {
-    case Position(ref, _, client, StaticProviderData(_, _, _, color), lon, lat) =>
-      positionToPublish :+= WebPosition(ref.toString, client.fold(false)(_ => true), lat, lon, color)
+    case Position(ref, _, client, StaticProviderData(_, _, _, color), coords) =>
+      positionToPublish :+= WebPosition(ref.toString, client.fold(false)(_ => true), coords.lat.value, coords.lon.value, color)
     case Publish =>
       send(TextFrame(positionToPublish.toJson.toString))
       positionToPublish = List[WebPosition]()

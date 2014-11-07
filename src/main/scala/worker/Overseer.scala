@@ -3,21 +3,24 @@ package worker
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
+import akka.actor.actorRef2Scala
+import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.routing.RequestContext
 import taxilator.Taxi
 import taxilator.Taxi.Client
 import taxilator.Taxi.ClientDelivered
 import taxilator.Taxi.PickupAndThen
-import taxilator.Taxi.StaticProviderData
-import taxilator.Taxi.Coords
 import taxilator.Taxi.Position
+import taxilator.Taxi.StaticProviderData
+import taxilator.Units.Coords
+import taxilator.Units.RichVector2Udegree
 import web.TaxiService.Arrival
+import web.TaxiService.Coordinates
 import web.TaxiService.DriverMessage
 import web.TaxiService.Error
 import web.TaxiService.Estimate
 import web.TaxiService.Order
 import web.TaxiService.PossibleJourneys
-import web.TaxiService.Coordinates
 import web.TaxiService.Preferences
 import web.TaxiService.Provider
 import web.TaxiService.UserPosition
@@ -43,8 +46,8 @@ class Overseer extends Actor {
   var completedOrders = Map[Int, Order]()
 
   def receive = {
-    case Position(ref, andThen, client, provider, lon, lat) =>
-      val providerSet = taxiMap.getOrElse(provider, Seq()).filterNot(_.ref == ref) :+ TaxiInstance(ref, andThen, client, Coords(lat = lat, lon = lon))
+    case Position(ref, andThen, client, provider, coords) =>
+      val providerSet = taxiMap.getOrElse(provider, Seq()).filterNot(_.ref == ref) :+ TaxiInstance(ref, andThen, client, coords)
       taxiMap += (provider -> providerSet)
 
     case ClientDelivered =>
@@ -91,7 +94,7 @@ class Overseer extends Actor {
         val (_, arrivalEta) = distanceAndTime(taxi.coords, userPosition.coordinates.asCoords)
         val arrival = Arrival(
           (math.random * 1000).toInt,
-          Coordinates(lat = taxi.coords.lat, lon = taxi.coords.lon),
+          Coordinates(lat = taxi.coords.lat.value, lon = taxi.coords.lon.value),
           arrivalEta, pickedUp = false, arrived = false
         )
         taxi.ref ! PickupAndThen(userPosition.coordinates.asCoords, destination.coordinates.asCoords)
@@ -109,7 +112,7 @@ class Overseer extends Actor {
             case Some(_) => distanceAndTime(taxi.coords, order.order.userPosition.coordinates.asCoords)._2 -> false
             case None => distanceAndTime(taxi.coords, order.order.destination.coordinates.asCoords)._2 -> true
           }
-          val arrival = Arrival(orderId, Coordinates(lat = taxi.coords.lat, lon = taxi.coords.lon), arrivalEta, pickedUp, arrived = false)
+          val arrival = Arrival(orderId, Coordinates(lat = taxi.coords.lat.value, lon = taxi.coords.lon.value), arrivalEta, pickedUp, arrived = false)
           ctx.complete(arrival)
 
         case Some(Left(order)) =>
@@ -140,8 +143,8 @@ class Overseer extends Actor {
     taxisInOrderTo(destination).mapValues(_.head)
 
   def distanceAndTime(from: Coords, to: Coords) = {
-    val distanceMeters = (to - from).mag
-    val arrivalEta = distanceMeters / (Taxi.CarSpeedMetersPerMs * 1000) // euristics
-    (distanceMeters.toLong, arrivalEta.toLong)
+    val distanceMeters = (to - from).length
+    val arrivalEta = distanceMeters / (Taxi.CarSpeed * 1000) // euristics
+    (distanceMeters.value.toLong, arrivalEta.value.toLong)
   }
 }

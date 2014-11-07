@@ -1,18 +1,25 @@
 package taxilator.navigation
 
+import scala.concurrent.duration.DurationInt
+
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.actor.Props
 import akka.io.IO
-import akka.util.Timeout
 import akka.pattern.pipe
+import akka.util.Timeout
 import spray.can.server.UHttp
-import spray.client.pipelining._
+import spray.client.pipelining.Get
+import spray.client.pipelining.WithTransformerConcatenation
+import spray.client.pipelining.sendReceive
+import spray.client.pipelining.unmarshal
 import spray.http.Uri
 import spray.http.Uri.Query
+import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.json.DefaultJsonProtocol
-import spray.util._
-import taxilator.Taxi.{Coords, Route}
+import taxilator.Taxi.Route
+import taxilator.Units.Coords
+import taxilator.Units.RichVector2Udegree
 import taxilator.navigation.Navigator.NavigationRequest
 
 object YourNavigationJsonProtocol extends DefaultJsonProtocol {

@@ -3,10 +3,11 @@ package taxilator.navigation
 import akka.actor.Actor
 import akka.actor.ActorRef
 import akka.actor.Props
+import akka.actor.actorRef2Scala
+import akka.contrib.throttle.Throttler.RateInt
+import akka.contrib.throttle.Throttler.SetTarget
 import akka.contrib.throttle.TimerBasedThrottler
-import akka.contrib.throttle.Throttler._
-import taxilator.Taxi.Coords
-import taxilator.navigation.Navigator.NavigationRequest
+import taxilator.Units.Coords
 
 object Navigator {
   case class NavigationRequest(from: Coords, to: Coords, receiver: ActorRef)
@@ -15,6 +16,8 @@ object Navigator {
 }
 
 class Navigator extends Actor {
+
+  import taxilator.navigation.Navigator._
 
   val throttler = context.system.actorOf(Props(classOf[TimerBasedThrottler], 2.msgsPerSecond))
   throttler ! SetTarget(Some(context.actorOf(GoogleDirections.props)))

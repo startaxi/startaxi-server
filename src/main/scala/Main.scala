@@ -72,7 +72,7 @@ object Main {
   def main(args: Array[String]) {
 
     implicit val system = ActorSystem()
-    val overseer = system.actorOf(Overseer.props)
+    val overseer = system.actorOf(Overseer.props, "overseer")
     val workerProps = (conn: ActorRef) => Props(new StartaxiService(conn, overseer))
     val server = system.actorOf(WebSocketServer.props(workerProps), "websocket")
     val navigator = system.actorOf(Navigator.props, "navigator")

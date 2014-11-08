@@ -41,8 +41,10 @@ trait TaxiPublisher { this: WebSocketWorker =>
     case Position(ref, _, client, StaticProviderData(_, _, _, color), coords) =>
       positionToPublish :+= WebPosition(ref.toString, client.fold(false)(_ => true), coords.lat.value, coords.lon.value, color)
     case Publish =>
-      send(TextFrame(positionToPublish.toJson.toString))
-      positionToPublish = List[WebPosition]()
+      if (positionToPublish.nonEmpty) {
+        send(TextFrame(positionToPublish.toJson.toString))
+        positionToPublish = List[WebPosition]()
+      }
   }
 
 }

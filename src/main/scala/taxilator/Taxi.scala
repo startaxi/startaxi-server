@@ -93,7 +93,9 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
       case Nil =>
         log.info(s"Got empty path when trying to move from $position")
         goToRandomLocation(position)
-      case _ => context.become(busy(position, route, DateTime.now, andThen, client))
+      case _ =>
+        log.info(s"Resolved destination. Going from $position to ${route.path.last} in ${route.path.size} hops.")
+        context.become(busy(position, route, DateTime.now, andThen, client))
     }
     case PickupAndThen(pickupFrom, newAndThen) => client match {
       case Some(Client(o)) => // neg

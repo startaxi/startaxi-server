@@ -37,7 +37,7 @@ object Settings {
     val provider = Class.forName(config.getString("navigation.default.provider"))
     val rate = {
       val initialRate = Rate(config.getInt("navigation.default.requests"), config.getDuration("navigation.default.per", TimeUnit.MINUTES).minutes)
-      val normalizedRate = Rate(1, (initialRate.durationInMillis() / initialRate.numberOfCalls) milliseconds)
+      val normalizedRate = Rate(1, (initialRate.durationInMillis() / initialRate.numberOfCalls).milliseconds)
       normalizedRate
     }
   }

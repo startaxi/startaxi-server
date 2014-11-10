@@ -12,12 +12,12 @@ object Units {
   implicit val rad_to_deg = one[radian].contains(180 / math.Pi)[degree]
 
   implicit class RichVector2Udegree(vector: Coords) {
-    def lat = vector.x
-    def lon = vector.y
+    def lon = vector.x
+    def lat = vector.y
 
     def distanceTo(to: Vector2U[degree])(implicit planet: Planet): Vector2U[metre] = {
-      val (δlat, δlon) = (vector - to).convert[radian].value
-      Vector2U(δlat * planet.radius, δlon * planet.r(vector.lat))
+      val (δlon, δlat) = (vector - to).convert[radian].value
+      Vector2U(δlon * planet.r(vector.lat), δlat * planet.radius)
     }
 
     def offsetBy(by: Vector2U[metre])(implicit planet: Planet): Vector2U[degree] = {
@@ -35,7 +35,7 @@ object Units {
   type Coords = Vector2U[degree]
 
   object Coords {
-    def apply(lat: Double, lon: Double): Vector2U[degree] = Vector2U(lat.of[degree], lon.of[degree])
+    def apply(lon: Double, lat: Double): Vector2U[degree] = Vector2U(lon.of[degree], lat.of[degree])
   }
 
   case class Planet(radius: DoubleU[metre]) {

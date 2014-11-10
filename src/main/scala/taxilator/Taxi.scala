@@ -111,18 +111,20 @@ class Taxi(provider: Taxi.StaticProviderData, navigator: ActorRef) extends Actor
       val now = DateTime.now
       val timeSince = (timestamp to now).millis.milli[second]
 
-      val direction = (route.path.head - position).unit
+      val path = route.path.dropWhile(next => (next - position).length == 0.of[degree])
+
+      val direction = (path.head - position).unit
       val projectedPos = position offsetBy (direction * CarSpeed * timeSince)
 
-      val distanceToPath = (position distanceTo route.path.head).length
+      val distanceToPath = (position distanceTo path.head).length
       val distanceToProjectedPos = (position distanceTo projectedPos).length
 
       val (newPos, newPath, timeLeft) =
         if (distanceToProjectedPos > distanceToPath) {
           self ! Wrum // need another Wrum to use the remaining time
-          (route.path.head, route.path.tail, (distanceToProjectedPos - distanceToPath) / CarSpeed)
+          (path.head, path.tail, (distanceToProjectedPos - distanceToPath) / CarSpeed)
         } else
-          (projectedPos, route.path, 0.0.of[second])
+          (projectedPos, path, 0.0.of[second])
 
       log.debug(s"busybusy, direction: $direction, projectedPos: $projectedPos, timeLeft: $timeLeft, newPos: $newPos, millisSince: $timeSince, timestamp: $timestamp, distanceToPath: $distanceToPath, distanceToProjectedPos: $distanceToProjectedPos, newPathSize: ${newPath.size}")
       publish(andThen, client, newPos)

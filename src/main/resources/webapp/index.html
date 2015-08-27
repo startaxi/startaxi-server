@@ -23,12 +23,11 @@
 
     var map = L.map('map').setView([54.688723, 25.270403], 13);
 
-    L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
+    L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
       maxZoom: 18,
-      attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
-        '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-        'Imagery © <a href="http://mapbox.com">Mapbox</a>',
-      id: 'examples.map-i875mjb7'
+      attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+      id: '2m.e2e769ce',
+      accessToken: 'pk.eyJ1IjoiMm0iLCJhIjoiMDNiMDg4ZDIwZTI2Y2IzNDQ0MWI3ZjA5YmExNDE2NWIifQ.iUf3utKOao-60dj1WQS8Bw'
     }).addTo(map);
 
     function connect() {

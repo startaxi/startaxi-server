@@ -29,6 +29,8 @@ import worker.Overseer
 object Settings {
   val config = ConfigFactory.load().getConfig("startaxi")
 
+  val web = config.getConfig("web")
+
   val taxiCount = config.getInt("taxi-count")
 
   val googleDirectionsApiKey = config.getString("google-directions-api-key")
@@ -89,10 +91,9 @@ object Main {
       system.actorOf(Taxi.props(provider, navigator), s"taxi-${provider.id}-$index")
     }
 
-    val port = sys.env.getOrElse("PORT", "8080").toInt
-    IO(UHttp) ! Http.Bind(server, "0.0.0.0", port)
+    IO(UHttp) ! Http.Bind(server, Settings.web.getString("iface"), Settings.web.getInt("port"))
 
-    if (port == 8080) {
+    if (Settings.web.getInt("port") == 8080) {
       // running from dev machine, support shutdown
       StdIn.readLine()
       system.shutdown()

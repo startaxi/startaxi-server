@@ -4,7 +4,7 @@ name := "startaxi-server"
 scalaVersion := "2.11.7"
 
 libraryDependencies ++= {
-  val akkaVersion = "2.3.12"
+  val akkaVersion = "2.3.14"
   val sprayVersion = "1.3.3"
   val unitsVersion = "0.2.1"
   Seq(
@@ -23,7 +23,7 @@ libraryDependencies ++= {
 
 resolvers += "spray repo" at "http://repo.spray.io"
 
-enablePlugins(JavaAppPackaging)
+enablePlugins(JavaAppPackaging, DockerPlugin)
 
 enablePlugins(GitVersioning)
 git.useGitDescribe := true

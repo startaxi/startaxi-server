@@ -1,16 +1,16 @@
 organization := "startaxi"
 name := "startaxi-server"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 libraryDependencies ++= {
-  val akkaVersion = "2.3.14"
-  val sprayVersion = "1.3.3"
+  val akkaVersion = "2.4.12"
+  val sprayVersion = "1.3.4"
   val unitsVersion = "0.2.1"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "com.typesafe.akka" %% "akka-contrib" % akkaVersion,
-    "io.spray" %% "spray-routing" % sprayVersion,
+    "io.spray" %% "spray-routing-shapeless23" % sprayVersion,
     "io.spray" %% "spray-can" % sprayVersion,
     "io.spray" %% "spray-client" % sprayVersion,
     "io.spray" %% "spray-json" % "1.3.2",
@@ -24,6 +24,3 @@ libraryDependencies ++= {
 resolvers += "spray repo" at "http://repo.spray.io"
 
 enablePlugins(JavaAppPackaging, DockerPlugin)
-
-enablePlugins(GitVersioning)
-git.useGitDescribe := true
